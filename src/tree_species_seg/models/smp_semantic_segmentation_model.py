@@ -1,6 +1,6 @@
 """Lightning Module for Forest Species Semantic Segmentation."""
 
-from typing import Any, Dict, Optional, Tuple, Union, Type, cast
+from typing import Any, Dict, Literal, Optional, Tuple, Union, Type, cast
 
 import lightning as pl
 import torch
@@ -33,6 +33,7 @@ def initialize_model(config, checkpoint_path=None):
         freeze_encoder=config.get("freeze_encoder", True),
         freeze_decoder_except_final=config.get("freeze_decoder_except_final", True),
         learning_rate=config["learning_rate"] * 0.1,
+        loss_class_weight=config.get("loss_class_weight", "none"),
     )
 
 
@@ -48,6 +49,8 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         model_name: str = "unet",
         encoder_name: str = "resnet34",
         loss_type: Union[str, Type[nn.Module]] = "cross_entropy",
+        loss_class_weight: Literal["none", "square_root", "linear"] = "none",
+        label_smoothing: Optional[float] = None,
         max_epochs: int = 100,  # pylint: disable=unused-argument
         transfer_config: Optional[Dict[str, Any]] = None,
     ):
@@ -62,6 +65,10 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
             model_name: Name of the segmentation model ('unet', 'unetpp', 'deeplabv3', etc.)
             encoder_name: Name of the encoder backbone
             loss_type: Type of loss function to use
+            loss_class_weight: Weighting scheme to weight the loss based on the class distribution. Only used if the
+                :code:`loss_type` is set to :code:`cross_entropy`.
+            label_smoothing: Amount of label smoothing to apply to the loss. Only used if the :code:`loss_type` is set
+                to :code:`cross_entropy`.
             max_epochs: Maximum number of epochs (needed for cosine scheduler)
         """
         super().__init__()
@@ -69,7 +76,12 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
 
         self.model = self._create_model(model_name, encoder_name, in_channels, num_classes)
         self.transfer_config = transfer_config
-        self.loss = self._create_loss_function(loss_type)
+        self._loss_config = {
+            "loss_type": loss_type,
+            "label_smoothing": label_smoothing,
+            "class_weight": loss_class_weight,
+        }
+        self.loss = self._create_loss_function()
 
         # Create global metrics (no per-step logging)
         self._setup_metrics(num_classes)
@@ -177,27 +189,59 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
             classes=num_classes,
         )
 
-    def _create_loss_function(self, loss_type: Union[str, Type[nn.Module]]):
+    def _create_loss_function(self, class_distribution: Optional[Dict[int, int]] = None):
         """Create loss function based on specified type."""
-        if isinstance(loss_type, nn.Module):
-            return loss_type
-
-        loss_type = cast(str, loss_type)
+        if isinstance(self._loss_config["loss_type"], nn.Module):
+            return self._loss_config["loss_type"]
 
         loss_map = {
-            "cross_entropy": nn.CrossEntropyLoss(ignore_index=-1),
-            "dice": smp.losses.DiceLoss(mode="multiclass", ignore_index=-1),
-            "focal": smp.losses.FocalLoss(mode="multiclass", ignore_index=-1),
-            "lovasz": smp.losses.LovaszLoss(mode="multiclass", ignore_index=-1),
-            "tversky": smp.losses.TverskyLoss(mode="multiclass", ignore_index=-1),
-            "combined": CombinedLoss(ignore_index=-1),
+            "cross_entropy": nn.CrossEntropyLoss,
+            "dice": smp.losses.DiceLoss,  # (mode="multiclass", **loss_kwargs),
+            "focal": smp.losses.FocalLoss,  # (mode="multiclass", **loss_kwargs),
+            "lovasz": smp.losses.LovaszLoss,  # (mode="multiclass", **loss_kwargs),
+            "tversky": smp.losses.TverskyLoss,  # (mode="multiclass", **loss_kwargs),
+            "combined": CombinedLoss,  # (**loss_kwargs),
         }
 
-        loss_fn = loss_map.get(loss_type.lower())
-        if loss_fn is None:
+        loss_type = cast(str, self._loss_config["loss_type"])
+
+        kwargs = {"ignore_index": -1}
+
+        if loss_type in ["dice", "focal", "lovasz", "tversky"]:
+            kwargs["mode"] = "multiclass"
+
+        if self._loss_config["label_smoothing"] is not None and loss_type == "cross_entropy":
+            kwargs["label_smoothing"] = self._loss_config["label_smoothing"]
+        if (
+            self._loss_config["class_weight"] in ["square_root", "linear"]
+            and class_distribution is not None
+            and loss_type == "cross_entropy"
+        ):
+            class_distribution_tensor = torch.tensor(class_distribution.values(), device=self.device, dtype=torch.float)
+
+            if self._loss_config["class_weight"] == "square_root":
+                class_weights = 1 / torch.sqrt(class_distribution_tensor)
+            elif self._loss_config["class_weight"] == "linear":
+                class_weights = 1 / class_distribution_tensor
+
+            kwargs["weight"] = class_weights
+
+        loss_cls = loss_map.get(loss_type.lower())
+        if loss_cls is None:
             raise ValueError(f"Unsupported loss type: {loss_type}")
 
-        return loss_fn
+        return loss_cls(**kwargs)
+
+    def setup(self, stage: Optional[str] = None):
+        if stage in ["train", "val"]:
+            class_distribution = self.trainer.datamodule.train_dataset.class_distribution()
+
+            if class_distribution is None:
+                raise ValueError("Could not retrieve class distribution from training set.")
+
+            class_distribution = torch.from_numpy(class_distribution).to(device=self.device)
+
+            self.loss_fn = self._create_loss_function(class_distribution=class_distribution)
 
     def configure_optimizers(self):
         if self.transfer_config and (

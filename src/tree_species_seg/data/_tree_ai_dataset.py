@@ -2,6 +2,7 @@
 
 __all__ = ["TreeAIDataset"]
 
+import json
 import os
 from pathlib import Path
 from typing import Dict, Literal, Optional, Union
@@ -57,8 +58,11 @@ class TreeAIDataset(Dataset):
             self._split_dir_partial = self._base_dir / "34_RGB_SemSegm_640_pL" / self._split
         else:
             self._split_dir_full = self._base_dir
+        self._label_type = "full" if not self._include_partially_labeled_data else "merged"
+        self._class_distribution_file = self._output_dir / self._label_type / self._split / "class_distribution.json"
 
         self.class_mapping = self._get_class_mapping()
+        self.class_distribution = {}
         self._img_metadata = self._preprocess_dataset()
 
     def _get_class_mapping(self) -> Dict[int, int]:
@@ -91,9 +95,10 @@ class TreeAIDataset(Dataset):
         """
         print("Preprocess dataset...")
 
-        label_type = "full" if not self._include_partially_labeled_data else "merged"
         image_folder = self._split_dir_full / "images" if self._split in ["train", "val"] else self._split_dir_full
         label_folder = self._split_dir_full / "labels"
+
+        reprocess_dataset = False
 
         all_images = []
         images = []
@@ -118,10 +123,15 @@ class TreeAIDataset(Dataset):
                 all_images.append(metadata)
                 image_idx += 1
             else:
-                image_path_npy = (self._output_dir / label_type / self._split / "images" / file).with_suffix(".npy")
-                label_path_npy = (self._output_dir / label_type / self._split / "labels" / file).with_suffix(".npy")
+                image_path_npy = (self._output_dir / self._label_type / self._split / "images" / file).with_suffix(
+                    ".npy"
+                )
+                label_path_npy = (self._output_dir / self._label_type / self._split / "labels" / file).with_suffix(
+                    ".npy"
+                )
 
                 if not image_path_npy.exists() or not label_path_npy.exists() or self._force_reprocess:
+                    reprocess_dataset = True
                     try:
                         with rasterio.open(image_path) as img_file:
                             image = img_file.read()
@@ -150,6 +160,7 @@ class TreeAIDataset(Dataset):
                     for original_class_idx, remapped_class_idx in self.class_mapping.items():
                         mask = label_image == original_class_idx
                         label_image[mask] = remapped_class_idx
+                        class_distribution[remapped_class_idx] += mask.sum()
 
                     image_path_npy.parent.mkdir(exist_ok=True, parents=True)
                     np.save(image_path_npy, image)
@@ -164,6 +175,17 @@ class TreeAIDataset(Dataset):
                 }
                 all_images.append(metadata)
                 image_idx += 1
+
+        if self._split in ["train", "val"] and reprocess_dataset:
+            class_distribution = {class_idx: 0 for class_idx in self.class_mapping.values()}
+            for image_idx, (image_path, label_path, fully_labeled) in enumerate(images):
+                label_path = self._output_dir / self._label_type / self._split / "labels" / label_path.name
+                label_image = np.load(label_path)
+                class_indices, class_counts = np.unique(label_image, return_counts=True)
+                for class_idx, class_count in zip(class_indices, class_counts):
+                    class_distribution[class_idx] += class_count
+            with open(self._class_distribution_file, mode="w", encoding="utf-8") as f:
+                json.dump(class_distribution, f)
 
         return all_images
 
@@ -208,3 +230,11 @@ class TreeAIDataset(Dataset):
             data_item["mask"] = mask
 
         return data_item
+
+    def class_distribution(self) -> Optional[Dict[int, int]]:
+        if self._class_distribution_file.exists():
+            with open(self._class_distribution_file, mode="r", encoding="utf-8") as f:
+                class_distribution = json.load(f)
+            return class_distribution
+
+        return None
