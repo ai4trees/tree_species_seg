@@ -17,7 +17,7 @@ class CombinedLoss(torch.nn.Module):
         ce_kwargs = {}
         if ignore_index is not None:
             ce_kwargs["ignore_index"] = ignore_index
-        self.ce_loss = torch.nn.CrossEntropyLoss(**ce_kwargs)
+        self.ce_loss = torch.nn.CrossEntropyLoss(**ce_kwargs)  # type: ignore[arg-type]
         self.dice_weight = dice_weight
         self.ce_weight = ce_weight
 
