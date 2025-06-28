@@ -31,7 +31,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         num_workers: int = 4,
         transforms: Optional[Dict] = None,
         force_reprocess: bool = False,
-        dataset_config: Dict[str, Any] = None,
+        dataset_config: Optional[Dict[str, Any]] = None,
         **kwargs,  # pylint: disable=unused-argument
     ):
         super().__init__()
@@ -42,7 +42,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         self._batch_size = batch_size
         self._num_workers = num_workers
         self._force_reprocess = force_reprocess
-        self._dataset_config = dataset_config
+        self._dataset_config = dataset_config or {}
 
         # Will be set in setup()
         self.train_dataset: Optional[TreeAIDataset] = None
@@ -61,9 +61,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         if split == "train":
             transforms.extend(
                 [
-                    A.RandomRotate90(p=0.5),
-                    A.HorizontalFlip(p=0.5),
-                    A.VerticalFlip(p=0.5),
+                    A.SquareSymmetry(p=0.5),
                 ]
             )
 

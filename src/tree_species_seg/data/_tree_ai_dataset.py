@@ -85,7 +85,7 @@ class TreeAIDataset(Dataset):
 
         return class_mapping
 
-    def _preprocess_dataset(self):  # pylint: disable=too-many-locals
+    def _preprocess_dataset(self):  # pylint: disable=too-many-locals,too-many-branches
         """
         Preprocesses the dataset. This involves the following preprocessing steps:
 
