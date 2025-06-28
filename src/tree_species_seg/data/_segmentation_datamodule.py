@@ -61,9 +61,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         if split == "train":
             transforms.extend(
                 [
-                    A.RandomRotate90(p=0.5),
-                    A.HorizontalFlip(p=0.5),
-                    A.VerticalFlip(p=0.5),
+                    A.SquareSymmetry(p=0.5),
                 ]
             )
 
