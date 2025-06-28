@@ -57,12 +57,11 @@ class TreeAIDataset(Dataset):
             self._split_dir_full = self._base_dir / "12_RGB_SemSegm_640_fL" / self._split
             self._split_dir_partial = self._base_dir / "34_RGB_SemSegm_640_pL" / self._split
         else:
-            self._split_dir_full = self._base_dir
+            self._split_dir_full = self._base_dir / "SemSeg_test-images"
         self._label_type = "full" if not self._include_partially_labeled_data else "merged"
         self._class_distribution_file = self._output_dir / self._label_type / self._split / "class_distribution.json"
 
         self.class_mapping = self._get_class_mapping()
-        self.class_distribution = {}
         self._img_metadata = self._preprocess_dataset()
 
     def _get_class_mapping(self) -> Dict[int, int]:
@@ -85,7 +84,7 @@ class TreeAIDataset(Dataset):
 
         return class_mapping
 
-    def _preprocess_dataset(self):  # pylint: disable=too-many-locals,too-many-branches
+    def _preprocess_dataset(self):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """
         Preprocesses the dataset. This involves the following preprocessing steps:
 

@@ -33,7 +33,6 @@ def initialize_model(config, checkpoint_path=None):
         freeze_encoder=config.get("freeze_encoder", True),
         freeze_decoder_except_final=config.get("freeze_decoder_except_final", True),
         learning_rate=config["learning_rate"] * 0.1,
-        loss_class_weight=config.get("loss_class_weight", "none"),
     )
 
 
@@ -134,6 +133,8 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
             model_name=checkpoint["hyper_parameters"]["model_name"],
             encoder_name=checkpoint["hyper_parameters"]["encoder_name"],
             loss_type=checkpoint["hyper_parameters"]["loss_type"],
+            loss_class_weight=checkpoint["hyper_parameters"]["loss_class_weight"],
+            label_smoothing=checkpoint["hyper_parameters"]["label_smoothing"],
             learning_rate=learning_rate,
             transfer_config={
                 "freeze_encoder": freeze_encoder,
@@ -196,16 +197,16 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
 
         loss_map = {
             "cross_entropy": nn.CrossEntropyLoss,
-            "dice": smp.losses.DiceLoss,  # (mode="multiclass", **loss_kwargs),
-            "focal": smp.losses.FocalLoss,  # (mode="multiclass", **loss_kwargs),
-            "lovasz": smp.losses.LovaszLoss,  # (mode="multiclass", **loss_kwargs),
-            "tversky": smp.losses.TverskyLoss,  # (mode="multiclass", **loss_kwargs),
-            "combined": CombinedLoss,  # (**loss_kwargs),
+            "dice": smp.losses.DiceLoss,
+            "focal": smp.losses.FocalLoss,
+            "lovasz": smp.losses.LovaszLoss,
+            "tversky": smp.losses.TverskyLoss,
+            "combined": CombinedLoss,
         }
 
         loss_type = cast(str, self._loss_config["loss_type"])
 
-        kwargs = {"ignore_index": -1}
+        kwargs: Dict[str, Any] = {"ignore_index": -1}
 
         if loss_type in ["dice", "focal", "lovasz", "tversky"]:
             kwargs["mode"] = "multiclass"
@@ -220,11 +221,9 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
             class_distribution_tensor = torch.tensor(class_distribution.values(), device=self.device, dtype=torch.float)
 
             if self._loss_config["class_weight"] == "square_root":
-                class_weights = 1 / torch.sqrt(class_distribution_tensor)
+                kwargs["weight"] = 1 / torch.sqrt(class_distribution_tensor)
             elif self._loss_config["class_weight"] == "linear":
-                class_weights = 1 / class_distribution_tensor
-
-            kwargs["weight"] = class_weights
+                kwargs["weight"] = 1 / class_distribution_tensor
 
         loss_cls = loss_map.get(loss_type.lower())
         if loss_cls is None:
@@ -234,14 +233,12 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
 
     def setup(self, stage: Optional[str] = None):
         if stage in ["train", "val"]:
-            class_distribution = self.trainer.datamodule.train_dataset.class_distribution()
+            class_distribution = self.trainer.datamodule.train_dataset.class_distribution()  # type: ignore[attr-defined]
 
             if class_distribution is None:
                 raise ValueError("Could not retrieve class distribution from training set.")
 
-            class_distribution = torch.from_numpy(class_distribution).to(device=self.device)
-
-            self.loss_fn = self._create_loss_function(class_distribution=class_distribution)
+            self.loss = self._create_loss_function(class_distribution=class_distribution)
 
     def configure_optimizers(self):
         if self.transfer_config and (
