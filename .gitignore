@@ -167,4 +167,5 @@ tmp/
 *.png
 *.npy
 
+wandb/*
 lightning_logs/*
