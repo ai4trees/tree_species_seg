@@ -56,7 +56,7 @@ class TreeAIDataset(Dataset):
             self._split_dir_full = self._base_dir / "12_RGB_SemSegm_640_fL" / self._split
             self._split_dir_partial = self._base_dir / "34_RGB_SemSegm_640_pL" / self._split
         else:
-            self._split_dir_full = self._base_dir / "SemSeg_test-images"
+            self._split_dir_full = self._base_dir
 
         self.class_mapping = self._get_class_mapping()
         self._img_metadata = self._preprocess_dataset()
@@ -119,7 +119,7 @@ class TreeAIDataset(Dataset):
                 image_idx += 1
             else:
                 image_path_npy = (self._output_dir / label_type / self._split / "images" / file).with_suffix(".npy")
-                label_path_npy = (self._output_dir / label_type /self._split / "labels" / file).with_suffix(".npy")
+                label_path_npy = (self._output_dir / label_type / self._split / "labels" / file).with_suffix(".npy")
 
                 if not image_path_npy.exists() or not label_path_npy.exists() or self._force_reprocess:
                     try:

@@ -55,10 +55,11 @@ def main(
     torch.set_float32_matmul_precision("medium")
     seed_everything(seed=conf["seed"], workers=True)
 
-    dataset_config = conf["dataset"]
+    datamodule_config = conf["dataset"]
+    dataset_config = conf.get(conf["dataset"]["name"], {})
     model_config = conf["model"]
 
-    datamodule = SemanticSegmentationDataModule(**dataset_config)
+    datamodule = SemanticSegmentationDataModule(**datamodule_config, dataset_config=dataset_config)
     model = initialize_model(conf["model"], checkpoint)
 
     checkpoint_dir_name = f"{model_config['model_name']}_{model_config['encoder_name']}_{model_config['loss_type']}"

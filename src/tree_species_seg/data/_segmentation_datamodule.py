@@ -1,6 +1,6 @@
 __all__ = ["SemanticSegmentationDataModule"]
 
-from typing import Optional, Literal
+from typing import Any, Dict, Optional, Literal
 
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -29,8 +29,9 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         output_dir: str,
         batch_size: int = 8,
         num_workers: int = 4,
-        transforms: Optional[dict] = None,
+        transforms: Optional[Dict] = None,
         force_reprocess: bool = False,
+        dataset_config: Dict[str, Any] = None,
         **kwargs,  # pylint: disable=unused-argument
     ):
         super().__init__()
@@ -41,6 +42,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         self._batch_size = batch_size
         self._num_workers = num_workers
         self._force_reprocess = force_reprocess
+        self._dataset_config = dataset_config
 
         # Will be set in setup()
         self.train_dataset: Optional[TreeAIDataset] = None
@@ -88,6 +90,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
                 split="train",
                 transforms=self._get_transforms("train"),
                 force_reprocess=self._force_reprocess,
+                **self._dataset_config,
             )
 
             self.val_dataset = TreeAIDataset(
@@ -96,6 +99,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
                 split="val",
                 transforms=self._get_transforms("val"),
                 force_reprocess=self._force_reprocess,
+                **self._dataset_config,
             )
         if stage == "test" or stage is None:
             self.test_dataset = TreeAIDataset(
@@ -104,6 +108,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
                 split="test",
                 transforms=self._get_transforms("test"),
                 force_reprocess=self._force_reprocess,
+                **self._dataset_config,
             )
 
     def train_dataloader(self) -> DataLoader:
