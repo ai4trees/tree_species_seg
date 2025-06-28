@@ -14,7 +14,10 @@ class CombinedLoss(torch.nn.Module):
     def __init__(self, dice_weight: float = 0.5, ce_weight: float = 0.5, ignore_index: Optional[int] = None):
         super().__init__()
         self.dice_loss = smp.losses.DiceLoss(mode="multiclass", ignore_index=ignore_index)
-        self.ce_loss = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
+        ce_kwargs = {}
+        if ignore_index is not None:
+            ce_kwargs["ignore_index"] = ignore_index
+        self.ce_loss = torch.nn.CrossEntropyLoss(**ce_kwargs)
         self.dice_weight = dice_weight
         self.ce_weight = ce_weight
 
