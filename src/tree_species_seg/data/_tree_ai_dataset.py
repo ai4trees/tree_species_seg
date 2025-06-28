@@ -160,7 +160,6 @@ class TreeAIDataset(Dataset):
                     for original_class_idx, remapped_class_idx in self.class_mapping.items():
                         mask = label_image == original_class_idx
                         label_image[mask] = remapped_class_idx
-                        class_distribution[remapped_class_idx] += mask.sum()
 
                     image_path_npy.parent.mkdir(exist_ok=True, parents=True)
                     np.save(image_path_npy, image)
@@ -177,13 +176,14 @@ class TreeAIDataset(Dataset):
                 image_idx += 1
 
         if self._split in ["train", "val"] and reprocess_dataset:
-            class_distribution = {class_idx: 0 for class_idx in self.class_mapping.values()}
-            for image_idx, (image_path, label_path, fully_labeled) in enumerate(images):
-                label_path = self._output_dir / self._label_type / self._split / "labels" / label_path.name
-                label_image = np.load(label_path)
+            class_distribution = {class_idx: 0 for class_idx in range(len(self.class_mapping.values()) + 1)}
+            for image_info in all_images:
+                label_image = np.load(image_info["label_path"])
                 class_indices, class_counts = np.unique(label_image, return_counts=True)
                 for class_idx, class_count in zip(class_indices, class_counts):
-                    class_distribution[class_idx] += class_count
+                    if class_idx == -1:
+                        continue
+                    class_distribution[class_idx] += int(class_count)
             with open(self._class_distribution_file, mode="w", encoding="utf-8") as f:
                 json.dump(class_distribution, f)
 
