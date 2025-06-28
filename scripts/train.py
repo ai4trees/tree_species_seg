@@ -1,6 +1,7 @@
 """Training script."""
 
-from typing import Any, Dict, Optional, cast
+from pathlib import Path
+from typing import Optional
 
 import fire
 from lightning.pytorch import seed_everything, Trainer
@@ -56,7 +57,7 @@ def main(
     seed_everything(seed=conf["seed"], workers=True)
 
     datamodule_config = conf["dataset"]
-    dataset_config = conf.get(conf["dataset"]["name"], {})
+    dataset_config = datamodule_config.get(datamodule_config["name"], {})
     model_config = conf["model"]
 
     datamodule = SemanticSegmentationDataModule(**datamodule_config, dataset_config=dataset_config)
@@ -65,10 +66,11 @@ def main(
     checkpoint_dir_name = f"{model_config['model_name']}_{model_config['encoder_name']}_{model_config['loss_type']}"
     if run_name is not None:
         checkpoint_dir_name = f"{checkpoint_dir_name}_{run_name}"
+    checkpoint_dir = Path(conf["training"]["checkpoint_dir"]) / f"{datamodule_config['name']}/{checkpoint_dir_name}"
 
     callbacks = [
         ModelCheckpoint(
-            dirpath=f"../models/{dataset_config['name']}/{checkpoint_dir_name}/",
+            dirpath=checkpoint_dir,
             filename="checkpoint-{epoch}-iou={val/iou:.3f}",
             auto_insert_metric_name=False,
             monitor="val/iou",
