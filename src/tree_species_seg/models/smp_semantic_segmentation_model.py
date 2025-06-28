@@ -218,12 +218,16 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
             and class_distribution is not None
             and loss_type == "cross_entropy"
         ):
-            class_distribution_tensor = torch.tensor(class_distribution.values(), device=self.device, dtype=torch.float)
+            class_distribution_tensor = torch.tensor(
+                list(class_distribution.values()), device=self.device, dtype=torch.float
+            )
 
             if self._loss_config["class_weight"] == "square_root":
-                kwargs["weight"] = 1 / torch.sqrt(class_distribution_tensor)
+                class_weights = 1 / torch.sqrt(class_distribution_tensor)
             elif self._loss_config["class_weight"] == "linear":
-                kwargs["weight"] = 1 / class_distribution_tensor
+                class_weights = 1 / class_distribution_tensor
+            class_weights = class_weights / class_weights.sum() * class_distribution_tensor.sum()
+            kwargs["weight"] = class_weights
 
         loss_cls = loss_map.get(loss_type.lower())
         if loss_cls is None:
@@ -232,8 +236,9 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         return loss_cls(**kwargs)
 
     def setup(self, stage: Optional[str] = None):
-        if stage in ["train", "val"]:
-            class_distribution = self.trainer.datamodule.train_dataset.class_distribution()  # type: ignore[attr-defined]
+        if stage == "fit":
+            train_dataset = self.trainer.datamodule.train_dataset  # type: ignore[attr-defined]
+            class_distribution = train_dataset.class_distribution()
 
             if class_distribution is None:
                 raise ValueError("Could not retrieve class distribution from training set.")
