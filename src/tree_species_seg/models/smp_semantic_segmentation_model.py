@@ -4,7 +4,7 @@ from typing import Dict, Tuple, Union, Type
 
 import lightning as pl
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import torchmetrics
@@ -17,7 +17,7 @@ def initialize_model(config, checkpoint_path=None):
     """Initialize model with or without transfer learning."""
 
     if not checkpoint_path:
-        print(f"Initializing new model")
+        print("Initializing new model")
         return ForestSemanticSegmentationModule(**config)
 
     # Load checkpoint to check parameters
@@ -26,7 +26,7 @@ def initialize_model(config, checkpoint_path=None):
         return ForestSemanticSegmentationModule.load_from_checkpoint(checkpoint_path=checkpoint_path, **config)
 
     # Transfer learning if num_classes differ
-    print(f"Initializing transfer learning.")
+    print("Initializing transfer learning.")
     return ForestSemanticSegmentationModule.load_for_transfer_learning(
         checkpoint_path=checkpoint_path,
         new_num_classes=config["num_classes"],
@@ -39,16 +39,16 @@ def initialize_model(config, checkpoint_path=None):
 class ForestSemanticSegmentationModule(pl.LightningModule):
     """Lightning Module for Forest Species Semantic Segmentation."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-positional-arguments
         self,
         num_classes: int,
         in_channels: int = 3,
-        learning_rate: float = 1e-3,
-        weight_decay: float = 1e-5,
+        learning_rate: float = 1e-3,  # pylint: disable=unused-argument
+        weight_decay: float = 1e-5,  # pylint: disable=unused-argument
         model_name: str = "unet",
         encoder_name: str = "resnet34",
         loss_type: Union[str, Type[nn.Module]] = "cross_entropy",
-        max_epochs: int = 100,
+        max_epochs: int = 100,  # pylint: disable=unused-argument
         transfer_config: Dict = None,
     ):
         """
@@ -232,7 +232,7 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
             },
         }
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # pylint: disable=arguments-differ
         return self.model(x)
 
     def _shared_step(self, batch: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -247,7 +247,11 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
 
         return loss, preds, y
 
-    def training_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> Dict[str, torch.Tensor]:
+    def training_step(  # pylint: disable=arguments-differ
+        self,
+        batch: Dict[str, torch.Tensor],
+        batch_idx: int,  # pylint: disable=unused-argument
+    ) -> Dict[str, torch.Tensor]:
         loss, preds, targets = self._shared_step(batch)
 
         # Update metrics (but don't log per-step)
@@ -263,7 +267,11 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
 
         return loss
 
-    def validation_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> None:
+    def validation_step(  # pylint: disable=arguments-differ
+        self,
+        batch: Dict[str, torch.Tensor],
+        batch_idx: int,  # pylint: disable=unused-argument
+    ) -> None:
         loss, preds, targets = self._shared_step(batch)
 
         # Update metrics (but don't log per-step)
@@ -279,7 +287,11 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
 
         return loss
 
-    def test_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> None:
+    def test_step(  # pylint: disable=arguments-differ
+        self,
+        batch: Dict[str, torch.Tensor],
+        batch_idx: int,  # pylint: disable=unused-argument
+    ) -> None:
         loss, preds, targets = self._shared_step(batch)
 
         # Update metrics (but don't log per-step)
@@ -295,7 +307,11 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
 
         return loss
 
-    def predict_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def predict_step(  # pylint: disable=arguments-differ
+        self,
+        batch: Dict[str, torch.Tensor],
+        batch_idx: int,  # pylint: disable=unused-argument
+    ) -> torch.Tensor:
         x = batch["image"]
         logits = self(x)
         return torch.argmax(logits, dim=1)

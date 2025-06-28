@@ -1,5 +1,6 @@
 [MASTER]
 ignore=venv
+disable=missing-module-docstring,missing-function-docstring,duplicate-code
 
 [FORMAT]
 max-line-length=120

@@ -34,7 +34,7 @@ class TreeAIDataset(Dataset):
         transforms: Optional[A.Compose] = None,
         force_reprocess: bool = False,
     ):
-        super.__init__()
+        super().__init__()
         if split not in ["train", "val", "test"]:
             raise ValueError(f"Invalid split: {split}.")
 
@@ -70,7 +70,7 @@ class TreeAIDataset(Dataset):
 
         return class_mapping
 
-    def _preprocess_dataset(self):
+    def _preprocess_dataset(self):  # pylint: disable=too-many-locals
         """
         Preprocesses the dataset. This involves the following preprocessing steps:
 

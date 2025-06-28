@@ -18,7 +18,11 @@ from tree_species_seg.models.smp_semantic_segmentation_model import initialize_m
 
 
 def main(
-    config: str, wandb_project: Optional[str] = None, run_name: Optional[str] = None, tags: Optional[str] = None, checkpoint: Optional[str] = None
+    config: str,
+    wandb_project: Optional[str] = None,
+    run_name: Optional[str] = None,
+    tags: Optional[str] = None,
+    checkpoint: Optional[str] = None,
 ):
     """
     Args:
@@ -34,7 +38,9 @@ def main(
     wandb_logger = None
     if wandb_project is not None:
         tags = tags.split(",") if tags else []
-        run_name = run_name or f"{config['dataset']['name']}_{config['model']['model_name']}_{config['model']['encoder_name']}"
+        run_name = (
+            run_name or f"{config['dataset']['name']}_{config['model']['model_name']}_{config['model']['encoder_name']}"
+        )
         if checkpoint:
             run_name += "_resumed"
 
