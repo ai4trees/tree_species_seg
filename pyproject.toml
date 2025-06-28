@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools >=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tree_species_seg"
+version = "0.1.0"
+authors = [
+    {name = "Josafat-Mattias Burmeister", email = "burmeister@uni-potsdam.de"},
+    {name = "David Kuska", email = "david.kuska@student.hpi.de"},
+    {name = "Stefan Reder", email = "stefan.reder@hnee.de"},
+    {name = "Rico Richter", email = "rico.richter.1@uni-potsdam.de"},
+    {name = "Jan-Peter Mund", email = "jan-peter.mund@hnee.de"},
+    {name = "Jürgen Döllner", email = "doellner@uni-potsdam.de"},
+]
+maintainers = [
+    {name = "Josafat-Mattias Burmeister", email = "burmeister@uni-potsdam.de"},
+]
+description = "A Python package for semantic segmentation of tree species in UAV imagery."
+readme = "README.md"
+license = { file = "LICENSE" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+keywords = ["tree species", "uav imagery", "semantic segmentation", "data science"]
+requires-python = ">=3.10"
+dependencies = [
+    "albumentations",
+    "colorcet",
+    "fire",
+    "lightning",
+    "numpy",
+    "segmentation-models-pytorch",
+    "tqdm",
+    "wandb"
+]
+[project.optional-dependencies]
+dev = [
+    "black",
+    "mypy",
+    "pylint",
+]
+
+[project.urls]
+Homepage = "https://github.com/ai4trees/tree_species_classification_uav"
+Repository = "https://github.com/ai4trees/tree_species_classification_uav.git"
+Issues = "https://github.com/ai4trees/tree_species_classification_uav/issues"
+
+[tool.semantic_release]
+version_toml = [
+    "pyproject.toml:project.version"
+]
+branch = "main"
+changelog_file = "CHANGELOG.md"
+build_command = "python -m build"
+
+[tool.setuptools.package-data]
+tree_species_seg = ["*.typed"]
