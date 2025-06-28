@@ -1,6 +1,6 @@
 """Lightning Module for Forest Species Semantic Segmentation."""
 
-from typing import Dict, Tuple, Union, Type
+from typing import Any, Dict, Optional, Tuple, Union, Type, cast
 
 import lightning as pl
 import torch
@@ -49,7 +49,7 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         encoder_name: str = "resnet34",
         loss_type: Union[str, Type[nn.Module]] = "cross_entropy",
         max_epochs: int = 100,  # pylint: disable=unused-argument
-        transfer_config: Dict = None,
+        transfer_config: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the segmentation module.
@@ -178,6 +178,8 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         if isinstance(loss_type, nn.Module):
             return loss_type
 
+        loss_type = cast(str, loss_type)
+
         loss_map = {
             "cross_entropy": nn.CrossEntropyLoss(),
             "jaccard": smp.losses.JaccardLoss(mode="multiclass"),
@@ -251,7 +253,7 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         self,
         batch: Dict[str, torch.Tensor],
         batch_idx: int,  # pylint: disable=unused-argument
-    ) -> Dict[str, torch.Tensor]:
+    ) -> torch.Tensor:
         loss, preds, targets = self._shared_step(batch)
 
         # Update metrics (but don't log per-step)
@@ -271,7 +273,7 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         self,
         batch: Dict[str, torch.Tensor],
         batch_idx: int,  # pylint: disable=unused-argument
-    ) -> None:
+    ) -> torch.Tensor:
         loss, preds, targets = self._shared_step(batch)
 
         # Update metrics (but don't log per-step)
@@ -291,7 +293,7 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         self,
         batch: Dict[str, torch.Tensor],
         batch_idx: int,  # pylint: disable=unused-argument
-    ) -> None:
+    ) -> torch.Tensor:
         loss, preds, targets = self._shared_step(batch)
 
         # Update metrics (but don't log per-step)

@@ -1,6 +1,6 @@
 """Training script."""
 
-from typing import Optional
+from typing import Any, Dict, Optional, cast
 
 import fire
 from lightning.pytorch import seed_everything, Trainer
@@ -32,14 +32,14 @@ def main(
         checkpoint: Path to checkpoint file to resume from.
     """
     with open(config, "r") as file:
-        config = yaml.safe_load(file)
+        conf = yaml.safe_load(file)
 
     # Setup W&B
     wandb_logger = None
     if wandb_project is not None:
-        tags = tags.split(",") if tags else []
+        tag_list = tags.split(",") if tags else []
         run_name = (
-            run_name or f"{config['dataset']['name']}_{config['model']['model_name']}_{config['model']['encoder_name']}"
+            run_name or f"{conf['dataset']['name']}_{conf['model']['model_name']}_{conf['model']['encoder_name']}"
         )
         if checkpoint:
             run_name += "_resumed"
@@ -47,19 +47,19 @@ def main(
         wandb_logger = WandbLogger(
             project=wandb_project,
             name=run_name,
-            tags=tags,
+            tags=tag_list,
             log_model=True,  # Logs model checkpoints
-            config=config,  # Logs your configuration
+            config=conf,  # Logs your configuration
         )
 
     torch.set_float32_matmul_precision("medium")
-    seed_everything(seed=config["seed"], workers=True)
+    seed_everything(seed=conf["seed"], workers=True)
 
-    dataset_config = config["dataset"]
-    model_config = config["model"]
+    dataset_config = conf["dataset"]
+    model_config = conf["model"]
 
     datamodule = SemanticSegmentationDataModule(**dataset_config)
-    model = initialize_model(config["model"], checkpoint)
+    model = initialize_model(conf["model"], checkpoint)
 
     checkpoint_dir_name = f"{model_config['model_name']}_{model_config['encoder_name']}_{model_config['loss_type']}"
     if run_name is not None:
@@ -81,7 +81,7 @@ def main(
     ]
 
     trainer = Trainer(
-        max_epochs=model_config["max_epochs"],
+        max_epochs=int(model_config["max_epochs"]),
         callbacks=callbacks,
         logger=wandb_logger,
         num_nodes=1,

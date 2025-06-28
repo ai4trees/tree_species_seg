@@ -31,6 +31,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         num_workers: int = 4,
         transforms: Optional[dict] = None,
         force_reprocess: bool = False,
+        **kwargs,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -42,9 +43,9 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         self._force_reprocess = force_reprocess
 
         # Will be set in setup()
-        self.train_dataset = None
-        self.val_dataset = None
-        self.test_dataset = None
+        self.train_dataset: Optional[TreeAIDataset] = None
+        self.val_dataset: Optional[TreeAIDataset] = None
+        self.test_dataset: Optional[TreeAIDataset] = None
 
         # Set up transforms
         self.transforms = transforms or {}
@@ -107,7 +108,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
-            self.train_dataset,
+            self.train_dataset,  # type: ignore[arg-type]
             batch_size=self._batch_size,
             shuffle=True,
             num_workers=self._num_workers,
@@ -117,7 +118,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
 
     def val_dataloader(self) -> DataLoader:
         return DataLoader(
-            self.val_dataset,
+            self.val_dataset,  # type: ignore[arg-type]
             batch_size=self._batch_size,
             shuffle=False,
             num_workers=self._num_workers,
@@ -127,7 +128,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
 
     def test_dataloader(self) -> DataLoader:
         return DataLoader(
-            self.test_dataset,
+            self.test_dataset,  # type: ignore[arg-type]
             batch_size=self._batch_size,
             shuffle=False,
             num_workers=self._num_workers,

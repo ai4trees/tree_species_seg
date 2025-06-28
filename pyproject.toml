@@ -37,6 +37,8 @@ dependencies = [
     "fire",
     "lightning",
     "numpy",
+    "pyyaml",
+    "rasterio",
     "segmentation-models-pytorch",
     "tqdm",
     "wandb"
@@ -44,8 +46,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "black",
+    "matplotlib-stubs",
     "mypy",
     "pylint",
+    "types-PyYAML",
+    "types-tqdm",
 ]
 
 [project.urls]

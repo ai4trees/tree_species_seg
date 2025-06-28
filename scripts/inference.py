@@ -1,7 +1,7 @@
 """Inference script."""
 
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union, cast
 import yaml
 
 import colorcet as cc
@@ -13,17 +13,17 @@ import numpy.typing as npt
 import torch
 from tqdm import tqdm
 
-from tree_species_seg.data import SemanticSegmentationDataModule
+from tree_species_seg.data import SemanticSegmentationDataModule, TreeAIDataset
 from tree_species_seg.models.smp_semantic_segmentation_model import initialize_model, ForestSemanticSegmentationModule
 
 
 def create_visualization(
     image: npt.NDArray,
     color_map: npt.NDArray,
-    class_labels: Union[Dict[int, str], List[int]],
+    class_labels: Union[Dict[int, str], List[int], npt.NDArray],
     target: Optional[npt.NDArray] = None,
     prediction: Optional[npt.NDArray] = None,
-    save_path: Path = None,
+    save_path: Optional[Path] = None,
     figsize: tuple = (25, 7),  # Wider figure to accommodate legend
 ) -> None:
     """Create and save visualization of prediction results with side legend."""
@@ -71,7 +71,7 @@ def create_visualization(
             class_indices.append(i)
 
     # Create legend handles
-    handles = [plt.Rectangle((0, 0), 1, 1, fc=color_map[i]) for i in class_indices]
+    handles = [plt.Rectangle((0, 0), 1, 1, fc=color_map[i]) for i in class_indices]  # type: ignore[attr-defined]
 
     legend = fig.legend(
         handles,
@@ -100,14 +100,14 @@ def main(
     split: Literal["train", "val", "test"] = "test",
 ):
     with open(config, "r") as file:
-        config = yaml.safe_load(file)
+        conf = yaml.safe_load(file)
 
     torch.set_float32_matmul_precision("medium")
 
     output_dir_path = Path(output_dir)
     output_dir_path.mkdir(exist_ok=True, parents=True)
 
-    datamodule = SemanticSegmentationDataModule(**config["dataset"])
+    datamodule = SemanticSegmentationDataModule(**conf["dataset"])
 
     model = ForestSemanticSegmentationModule.load_from_checkpoint(checkpoint)
     model.eval()
@@ -120,12 +120,12 @@ def main(
     if split == "test":
         data_loader = datamodule.test_dataloader()
 
-    dataset = data_loader.dataset
+    dataset = cast(TreeAIDataset, data_loader.dataset)
 
     if visualization_dir is not None:
         visualization_dir_path = Path(visualization_dir)
         visualization_dir_path.mkdir(exist_ok=True, parents=True)
-        num_classes = max(dataset.inverse_class_mapping.values()) + 1
+        num_classes = max(dataset.class_mapping.keys()) + 1
         color_map = np.array([mcolors.to_rgb(color) for color in cc.glasbey])
         class_labels = np.arange(num_classes)
 
