@@ -31,7 +31,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         num_workers: int = 4,
         transforms: Optional[dict] = None,
         force_reprocess: bool = False,
-        **kwargs,
+        **kwargs,  # pylint: disable=unused-argument
     ):
         super().__init__()
         self.save_hyperparameters()

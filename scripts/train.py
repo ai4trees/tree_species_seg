@@ -38,15 +38,15 @@ def main(
     wandb_logger = None
     if wandb_project is not None:
         tag_list = tags.split(",") if tags else []
-        run_name = (
+        wandb_run_name = (
             run_name or f"{conf['dataset']['name']}_{conf['model']['model_name']}_{conf['model']['encoder_name']}"
         )
         if checkpoint:
-            run_name += "_resumed"
+            wandb_run_name += "_resumed"
 
         wandb_logger = WandbLogger(
             project=wandb_project,
-            name=run_name,
+            name=wandb_run_name,
             tags=tag_list,
             log_model=True,  # Logs model checkpoints
             config=conf,  # Logs your configuration

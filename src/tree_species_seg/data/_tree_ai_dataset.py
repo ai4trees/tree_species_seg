@@ -23,6 +23,9 @@ class TreeAIDataset(Dataset):
         output_dir: Path of the directory in which to store the preprocessed dataset.
         split: Subset of the TreeAI dataset to be used (:code:`"train"` | :code:`"val"` | :code:`"test"`).
         transforms: Optional dict of transform parameters.
+        include_partially_labeled_data: Whether the partially labeled data should be included in the dataset.
+        ignore_white_and_black_pixels: Whether pixels that are completely white or black should be masked in the loss
+            computation.
         force_reprocess: Whether preprocessing should be repeated if the preprocessed data already exist.
     """
 
@@ -32,6 +35,8 @@ class TreeAIDataset(Dataset):
         output_dir: str,
         split: Literal["train", "val", "test"] = "train",
         transforms: Optional[A.Compose] = None,
+        include_partially_labeled_data: bool = False,
+        ignore_white_and_black_pixels: bool = True,
         force_reprocess: bool = False,
     ):
         super().__init__()
@@ -43,11 +48,15 @@ class TreeAIDataset(Dataset):
         self._split = split
         self._force_reprocess = force_reprocess
         self.transforms = transforms
+        self._include_partially_labeled_data = include_partially_labeled_data
+        self._ignore_white_and_black_pixels = ignore_white_and_black_pixels
 
+        self._split_dir_partial = None
         if self._split in ["train", "val"]:
-            self._split_dir = self._base_dir / "12_RGB_SemSegm_640_fL" / self._split
+            self._split_dir_full = self._base_dir / "12_RGB_SemSegm_640_fL" / self._split
+            self._split_dir_partial = self._base_dir / "34_RGB_SemSegm_640_pL" / self._split
         else:
-            self._split_dir = self._base_dir / "SemSeg_test-images"
+            self._split_dir_full = self._base_dir / "SemSeg_test-images"
 
         self.class_mapping = self._get_class_mapping()
         self._img_metadata = self._preprocess_dataset()
@@ -64,9 +73,11 @@ class TreeAIDataset(Dataset):
         lines = lines[7:]
 
         class_mapping = {}
+        # the idx 0 indicates background pixels, therefore the species class IDs start with 1
+        start_id = 1
         for idx, line in enumerate(lines):
             class_id = int(line.split(" ")[0])
-            class_mapping[class_id] = idx
+            class_mapping[class_id] = idx + start_id
 
         return class_mapping
 
@@ -78,16 +89,26 @@ class TreeAIDataset(Dataset):
         - The images are converted into numpy files.
         - The labels are remapped to consecutive class indices and saved as numpy files.
         """
+        print("Preprocess dataset...")
 
-        image_folder = self._split_dir / "images" if self._split in ["train", "val"] else self._split_dir
-        label_folder = self._split_dir / "labels"
+        label_type = "full" if not self._include_partially_labeled_data else "merged"
+        image_folder = self._split_dir_full / "images" if self._split in ["train", "val"] else self._split_dir_full
+        label_folder = self._split_dir_full / "labels"
 
         all_images = []
-        image_idx = 0
+        images = []
         for file in os.listdir(image_folder):
-            if not file.endswith(".png"):
-                continue
+            if file.endswith(".png"):
+                images.append((image_folder / file, label_folder / file, True))
+        if self._include_partially_labeled_data and self._split in ["train", "val"]:
+            partially_labeled_image_folder = self._split_dir_partial / "images"
+            partially_labeled_label_folder = self._split_dir_partial / "labels"
+            for file in os.listdir(partially_labeled_image_folder):
+                if file.endswith(".png"):
+                    images.append((partially_labeled_image_folder / file, partially_labeled_label_folder / file, False))
 
+        for image_idx, (image_path, label_path, fully_labeled) in enumerate(images):
+            file = image_path.name
             if self._split == "test":
                 metadata = {
                     "idx": image_idx,
@@ -97,20 +118,34 @@ class TreeAIDataset(Dataset):
                 all_images.append(metadata)
                 image_idx += 1
             else:
-                image_path_npy = (self._output_dir / self._split / "images" / file).with_suffix(".npy")
-                label_path_npy = (self._output_dir / self._split / "labels" / file).with_suffix(".npy")
+                image_path_npy = (self._output_dir / label_type / self._split / "images" / file).with_suffix(".npy")
+                label_path_npy = (self._output_dir / label_type /self._split / "labels" / file).with_suffix(".npy")
 
                 if not image_path_npy.exists() or not label_path_npy.exists() or self._force_reprocess:
                     try:
-                        with rasterio.open(image_folder / file) as img_file:
+                        with rasterio.open(image_path) as img_file:
                             image = img_file.read()
                     except rasterio.errors.RasterioIOError:
                         # The training and validation set contain some invalid files that are skipped.
                         continue
 
-                    with rasterio.open(label_folder / file) as label_img_file:
+                    with rasterio.open(label_path) as label_img_file:
                         label_image = label_img_file.read()
                         label_image = np.squeeze(label_image, axis=0)
+
+                    label_image = label_image.astype(np.int64)
+
+                    if self._ignore_white_and_black_pixels:
+                        ignore_mask = np.logical_and(
+                            np.logical_or(
+                                (image == 0).all(axis=0),
+                                (image == 255).all(axis=0),
+                            ),
+                            label_image == 0,
+                        )
+                        label_image[ignore_mask] = -1
+                    if not fully_labeled:
+                        label_image[label_image == 0] = -1
 
                     for original_class_idx, remapped_class_idx in self.class_mapping.items():
                         mask = label_image == original_class_idx
@@ -147,30 +182,29 @@ class TreeAIDataset(Dataset):
         """
 
         image_info = self._img_metadata[idx]
-        data_item = {}
 
         if self._split in ["train", "val"]:
             # Load image and mask
             image = np.load(image_info["image_path"])
             mask = np.load(image_info["label_path"])
-
-            # Transpose image to HWC format for albumentations
-            image = np.transpose(image, (1, 2, 0))
-
-            # Apply transforms if any
-            if self.transforms:
-                transformed = self.transforms(image=image, mask=mask)
-                image = transformed["image"]
-                mask = transformed["mask"]
-
-            data_item["image"] = image
-            data_item["mask"] = mask
         else:
             with rasterio.open(image_info["image_path"]) as img_file:
                 image = img_file.read()
+            mask = None
 
-            data_item["image"] = image
+        # Transpose image to HWC format for albumentations
+        image = np.transpose(image, (1, 2, 0))
 
-        data_item["id"] = image_info["image_path"].stem
+        if self.transforms:
+            transformed = self.transforms(image=image, mask=mask)
+            image = transformed["image"]
+            mask = transformed["mask"]
+
+        data_item = {
+            "id": image_info["image_path"].stem,
+            "image": image,
+        }
+        if mask is not None:
+            data_item["mask"] = mask
 
         return data_item

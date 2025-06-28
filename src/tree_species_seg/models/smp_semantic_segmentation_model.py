@@ -84,14 +84,18 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         # Global metrics
         global_metrics = torchmetrics.MetricCollection(
             {
-                "iou": torchmetrics.JaccardIndex(task="multiclass", num_classes=num_classes),
-                "f1": torchmetrics.F1Score(task="multiclass", num_classes=num_classes),
+                "iou": torchmetrics.JaccardIndex(task="multiclass", num_classes=num_classes, ignore_index=-1),
+                "f1": torchmetrics.F1Score(task="multiclass", num_classes=num_classes, ignore_index=-1),
             }
         )
 
         # Per-class metrics
-        self.per_class_iou = torchmetrics.JaccardIndex(task="multiclass", num_classes=num_classes, average=None)
-        self.per_class_f1 = torchmetrics.F1Score(task="multiclass", num_classes=num_classes, average=None)
+        self.per_class_iou = torchmetrics.JaccardIndex(
+            task="multiclass", num_classes=num_classes, ignore_index=-1, average=None
+        )
+        self.per_class_f1 = torchmetrics.F1Score(
+            task="multiclass", num_classes=num_classes, ignore_index=-1, average=None
+        )
 
         # Clone for train/val/test
         self.train_metrics = global_metrics.clone(prefix="train/")
@@ -181,13 +185,12 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         loss_type = cast(str, loss_type)
 
         loss_map = {
-            "cross_entropy": nn.CrossEntropyLoss(),
-            "jaccard": smp.losses.JaccardLoss(mode="multiclass"),
-            "dice": smp.losses.DiceLoss(mode="multiclass"),
-            "focal": smp.losses.FocalLoss(mode="multiclass"),
-            "lovasz": smp.losses.LovaszLoss(mode="multiclass"),
-            "tversky": smp.losses.TverskyLoss(mode="multiclass"),
-            "combined": CombinedLoss(),
+            "cross_entropy": nn.CrossEntropyLoss(ignore_index=-1),
+            "dice": smp.losses.DiceLoss(mode="multiclass", ignore_index=-1),
+            "focal": smp.losses.FocalLoss(mode="multiclass", ignore_index=-1),
+            "lovasz": smp.losses.LovaszLoss(mode="multiclass", ignore_index=-1),
+            "tversky": smp.losses.TverskyLoss(mode="multiclass", ignore_index=-1),
+            "combined": CombinedLoss(ignore_index=-1),
         }
 
         loss_fn = loss_map.get(loss_type.lower())
@@ -257,12 +260,12 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         loss, preds, targets = self._shared_step(batch)
 
         # Update metrics (but don't log per-step)
-        self.train_metrics(preds, targets)
+        self.train_metrics.update(preds, targets)
         self.train_loss.update(loss)
 
         # Update per-class metrics
-        self.per_class_iou(preds, targets)
-        self.per_class_f1(preds, targets)
+        self.per_class_iou.update(preds, targets)
+        self.per_class_f1.update(preds, targets)
 
         # Log only loss per step for progress bar
         self.log("train/loss", loss, prog_bar=True)
@@ -277,12 +280,12 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         loss, preds, targets = self._shared_step(batch)
 
         # Update metrics (but don't log per-step)
-        self.val_metrics(preds, targets)
+        self.val_metrics.update(preds, targets)
         self.val_loss.update(loss)
 
         # Update per-class metrics
-        self.per_class_iou(preds, targets)
-        self.per_class_f1(preds, targets)
+        self.per_class_iou.update(preds, targets)
+        self.per_class_f1.update(preds, targets)
 
         # Log only loss per step for progress bar
         self.log("val/loss", loss, prog_bar=True)
@@ -297,12 +300,12 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         loss, preds, targets = self._shared_step(batch)
 
         # Update metrics (but don't log per-step)
-        self.test_metrics(preds, targets)
+        self.test_metrics.update(preds, targets)
         self.test_loss.update(loss)
 
         # Update per-class metrics
-        self.per_class_iou(preds, targets)
-        self.per_class_f1(preds, targets)
+        self.per_class_iou.update(preds, targets)
+        self.per_class_f1.update(preds, targets)
 
         # Log only loss per step for progress bar
         self.log("test/loss", loss, prog_bar=True)
