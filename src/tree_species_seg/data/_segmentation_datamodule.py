@@ -1,6 +1,6 @@
 __all__ = ["SemanticSegmentationDataModule"]
 
-from typing import Any, Dict, Optional, Literal
+from typing import Any, Dict, List, Optional, Literal
 
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -29,7 +29,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         output_dir: str,
         batch_size: int = 8,
         num_workers: int = 4,
-        transforms: Optional[Dict] = None,
+        transforms: Optional[List[str]] = None,
         force_reprocess: bool = False,
         dataset_config: Optional[Dict[str, Any]] = None,
         **kwargs,  # pylint: disable=unused-argument
@@ -50,20 +50,33 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         self.test_dataset: Optional[TreeAIDataset] = None
 
         # Set up transforms
-        self.transforms = transforms or {}
+        self.transforms = transforms or []
 
     def _get_transforms(self, split: Literal["train", "val", "test"]) -> A.Compose:
         """Get transformations for each split."""
 
         transforms = []
 
+        transforms_map = {
+            "random_brightness_contrast": A.RandomBrightnessContrast(),
+            "color_jitter": A.ColorJitter(brightness=(1, 1), hue=(0, 0)),
+            "random_gamma": A.RandomGamma(p=0.3),
+            "random_shadow": A.RandomShadow(
+                src_radius=64, num_shadows_limit=(0, 2), shadow_intensity_range=(0.2, 0.5), p=0.2
+            ),
+            "random_sun_flare": A.RandomSunFlare(src_radius=64, num_flare_circles_range=(0, 2), p=0.2),
+        }
+
         # Add augmentations for training
         if split == "train":
-            transforms.extend(
-                [
-                    A.SquareSymmetry(p=0.5),
-                ]
+            transforms.append(
+                A.SquareSymmetry(p=0.5),
             )
+
+            for transform in self.transforms:
+                if transform not in transforms_map:
+                    raise ValueError(f"Invalid transform: {transform}.")
+                transforms.append(transforms_map[transform])
 
         # Common transforms for all splits
         transforms.extend(
@@ -113,7 +126,9 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
         sampler = None
         if self._dataset_config.get("sampling_weight", "none") != "none":
             print("Using sampling weights", self.train_dataset.sampling_weights[:10])
-            sampler = WeightedRandomSampler(weights=self.train_dataset.sampling_weights, num_samples=len(self.train_dataset), replacement=True)
+            sampler = WeightedRandomSampler(
+                weights=self.train_dataset.sampling_weights, num_samples=len(self.train_dataset), replacement=True
+            )
 
         return DataLoader(
             self.train_dataset,  # type: ignore[arg-type]

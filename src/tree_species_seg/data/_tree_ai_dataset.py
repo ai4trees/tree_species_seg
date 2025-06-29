@@ -213,7 +213,7 @@ class TreeAIDataset(Dataset):
             for idx, image_info in enumerate(all_images):
                 label_image = np.load(image_info["label_path"])
                 label_image = label_image.flatten()
-                label_image = label_image[label_image != -1] 
+                label_image = label_image[label_image != -1]
 
                 self.sampling_weights[idx] = class_weights[label_image].sum()
             normalization_factor = len(all_images) / self.sampling_weights.sum()
