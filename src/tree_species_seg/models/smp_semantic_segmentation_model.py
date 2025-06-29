@@ -226,7 +226,8 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
                 class_weights = 1 / torch.sqrt(class_distribution_tensor)
             elif self._loss_config["class_weight"] == "linear":
                 class_weights = 1 / class_distribution_tensor
-            class_weights = class_weights / class_weights.sum() * class_distribution_tensor.sum()
+            normalization_factor = class_distribution_tensor.sum() / (class_distribution_tensor * class_weights).sum()
+            class_weights = class_weights * normalization_factor
             kwargs["weight"] = class_weights
 
         loss_cls = loss_map.get(loss_type.lower())
