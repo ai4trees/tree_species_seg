@@ -9,6 +9,15 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     curl \
     git \
     g++ \
+    gnupg \
+    libatomic1 \
+    libegl1 \  
+    libbz2-dev \
+    libffi-dev \
+    libgl1 \
+    libgomp1 \
+    lsb-release \
+    liblzma-dev \
     libssl-dev \
     make \
     software-properties-common \
