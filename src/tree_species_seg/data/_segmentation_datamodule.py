@@ -61,10 +61,8 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
             "random_brightness_contrast": A.RandomBrightnessContrast(),
             "color_jitter": A.ColorJitter(brightness=(1, 1), hue=(0, 0)),
             "random_gamma": A.RandomGamma(p=0.3),
-            "random_shadow": A.RandomShadow(
-                src_radius=64, num_shadows_limit=(0, 2), shadow_intensity_range=(0.2, 0.5), p=0.2
-            ),
-            "random_sun_flare": A.RandomSunFlare(src_radius=64, num_flare_circles_range=(0, 2), p=0.2),
+            "random_shadow": A.RandomShadow(num_shadows_limit=(1, 2), shadow_intensity_range=(0.2, 0.5), p=0.2),
+            "random_sun_flare": A.RandomSunFlare(src_radius=64, num_flare_circles_range=(1, 2), p=0.2),
         }
 
         # Add augmentations for training
