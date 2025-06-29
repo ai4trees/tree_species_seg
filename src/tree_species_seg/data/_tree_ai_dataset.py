@@ -9,6 +9,7 @@ from typing import Dict, Literal, Optional, Union
 
 import albumentations as A
 import numpy as np
+import numpy.typing as npt
 import rasterio
 import rasterio.errors
 import torch
@@ -39,6 +40,7 @@ class TreeAIDataset(Dataset):
         include_partially_labeled_data: bool = False,
         ignore_white_and_black_pixels: bool = True,
         force_reprocess: bool = False,
+        sampling_weight: Literal["none", "sqrt", "linear"] = "none",
     ):
         super().__init__()
         if split not in ["train", "val", "test"]:
@@ -66,6 +68,9 @@ class TreeAIDataset(Dataset):
             self._label_type = f"{self._label_type}_include_white_black"
 
         self._class_distribution_file = self._output_dir / self._label_type / self._split / "class_distribution.json"
+
+        self._sampling_weight = sampling_weight
+        self.sampling_weights: Optional[npt.NDArray] = None
 
         self.class_mapping = self._get_class_mapping()
         self._img_metadata = self._preprocess_dataset()
@@ -191,6 +196,30 @@ class TreeAIDataset(Dataset):
                     class_distribution[class_idx] += int(class_count)
             with open(self._class_distribution_file, mode="w", encoding="utf-8") as f:
                 json.dump(class_distribution, f)
+
+        if self._split in ["train"] and self._sampling_weight != "none":
+            class_distribution_np = np.array(list(class_distribution.values()), dtype=np.uint32)
+
+            if self._sampling_weight == "sqrt":
+                class_weights = 1 / np.sqrt(class_distribution_np)
+            elif self._loss_config["class_weight"] == "linear":
+                class_weights = 1 / class_distribution_np
+
+            normalization_factor = class_distribution_np.sum() / (class_distribution_np * class_weights).sum()
+            class_weights = class_weights * normalization_factor
+
+            self.sampling_weights = np.zeros(len(all_images), dtype=np.float32)
+
+            for idx, image_info in enumerate(all_images):
+                label_image = np.load(image_info["label_path"])
+                label_image = label_image.flatten()
+                label_image = label_image[label_image != -1] 
+
+                self.sampling_weights[idx] = class_weights[label_image].sum()
+            normalization_factor = len(all_images) / self.sampling_weights.sum()
+            self.sampling_weights = self.sampling_weights * normalization_factor
+        if self._split == "train" and self._sampling_weight == "none":
+            self.sampling_weights = np.ones(len(all_images), dtype=np.uint32)
 
         return all_images
 

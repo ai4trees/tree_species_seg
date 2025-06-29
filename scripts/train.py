@@ -95,6 +95,7 @@ def main(
         enable_model_summary=True,
         enable_checkpointing=True,
         precision="16-mixed",
+        accumulate_grad_batches=conf["training"].get("accumulate_grad_batches", 1),
     )
 
     trainer.fit(model, datamodule=datamodule)

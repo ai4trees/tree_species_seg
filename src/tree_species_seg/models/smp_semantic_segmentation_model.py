@@ -48,7 +48,7 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         model_name: str = "unet",
         encoder_name: str = "resnet34",
         loss_type: Union[str, Type[nn.Module]] = "cross_entropy",
-        loss_class_weight: Literal["none", "square_root", "linear"] = "none",
+        loss_class_weight: Literal["none", "sqrt", "linear"] = "none",
         label_smoothing: Optional[float] = None,
         max_epochs: int = 100,  # pylint: disable=unused-argument
         transfer_config: Optional[Dict[str, Any]] = None,
@@ -214,7 +214,7 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         if self._loss_config["label_smoothing"] is not None and loss_type == "cross_entropy":
             kwargs["label_smoothing"] = self._loss_config["label_smoothing"]
         if (
-            self._loss_config["class_weight"] in ["square_root", "linear"]
+            self._loss_config["class_weight"] in ["sqrt", "linear"]
             and class_distribution is not None
             and loss_type == "cross_entropy"
         ):
@@ -222,7 +222,7 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
                 list(class_distribution.values()), device=self.device, dtype=torch.float
             )
 
-            if self._loss_config["class_weight"] == "square_root":
+            if self._loss_config["class_weight"] == "sqrt":
                 class_weights = 1 / torch.sqrt(class_distribution_tensor)
             elif self._loss_config["class_weight"] == "linear":
                 class_weights = 1 / class_distribution_tensor

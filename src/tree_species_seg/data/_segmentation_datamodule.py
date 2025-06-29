@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional, Literal
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import lightning as pl
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from ._tree_ai_dataset import TreeAIDataset
 
@@ -110,10 +110,16 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
             )
 
     def train_dataloader(self) -> DataLoader:
+        sampler = None
+        if self._dataset_config.get("sampling_weight", "none") != "none":
+            print("Using sampling weights", self.train_dataset.sampling_weights[:10])
+            sampler = WeightedRandomSampler(weights=self.train_dataset.sampling_weights, num_samples=len(self.train_dataset), replacement=True)
+
         return DataLoader(
             self.train_dataset,  # type: ignore[arg-type]
             batch_size=self._batch_size,
-            shuffle=True,
+            shuffle=sampler is None,
+            sampler=sampler,
             num_workers=self._num_workers,
             pin_memory=True,
             persistent_workers=True,
