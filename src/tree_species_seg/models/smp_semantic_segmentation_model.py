@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 import torchmetrics
 import segmentation_models_pytorch as smp
 
-from tree_species_seg.losses import CombinedLoss
+from tree_species_seg.losses import CombinedLoss, FocalLoss
 
 
 def initialize_model(config, checkpoint_path=None):
@@ -196,9 +196,9 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
             return self._loss_config["loss_type"]
 
         loss_map = {
-            "cross_entropy": nn.CrossEntropyLoss,
+            "cross_entropy": nn.CrossEntropyLoss(),
             "dice": smp.losses.DiceLoss,
-            "focal": smp.losses.FocalLoss,
+            "focal": FocalLoss(),
             "lovasz": smp.losses.LovaszLoss,
             "tversky": smp.losses.TverskyLoss,
             "combined": CombinedLoss,
@@ -211,12 +211,12 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         if loss_type in ["dice", "focal", "lovasz", "tversky"]:
             kwargs["mode"] = "multiclass"
 
-        if self._loss_config["label_smoothing"] is not None and loss_type == "cross_entropy":
+        if self._loss_config["label_smoothing"] is not None and loss_type in ["cross_entropy", "focal"]:
             kwargs["label_smoothing"] = self._loss_config["label_smoothing"]
         if (
             self._loss_config["class_weight"] in ["sqrt", "linear"]
             and class_distribution is not None
-            and loss_type == "cross_entropy"
+            and loss_type in ["cross_entropy", "focal"]
         ):
             class_distribution_tensor = torch.tensor(
                 list(class_distribution.values()), device=self.device, dtype=torch.float
