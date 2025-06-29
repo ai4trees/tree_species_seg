@@ -59,6 +59,12 @@ class TreeAIDataset(Dataset):
         else:
             self._split_dir_full = self._base_dir / "SemSeg_test-images"
         self._label_type = "full" if not self._include_partially_labeled_data else "merged"
+
+        if self._ignore_white_and_black_pixels:
+            self._label_type = f"{self._label_type}_ignore_white_black"
+        else:
+            self._label_type = f"{self._label_type}_include_white_black"
+
         self._class_distribution_file = self._output_dir / self._label_type / self._split / "class_distribution.json"
 
         self.class_mapping = self._get_class_mapping()
