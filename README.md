@@ -15,7 +15,11 @@ This repository implements a deep learning pipeline for semantic segmentation of
 
 ```bash
 git clone https://github.com/ai4trees/tree_species_seg.git
+```
+```bash
 cd tree_species_seg
+```
+```bash
 python -m pip install -e .
 ```
 
@@ -68,7 +72,7 @@ The inference script has the following arguments:
 - Path to the trained **model checkpoint**.
 - Path to the **output directory** for predictions.
 - `--output-format` (optional): Output format for the model predictions. Must be either `.npy` or `.png` (default: `.npy`).
-`--visualization-dir` (optional): Path to a folder in which to save visualizations of the predictions. If not provided, no visualizations are created.
+- `--visualization-dir` (optional): Path to a folder in which to save visualizations of the predictions. If not provided, no visualizations are created.
 `--split`: Subset of the TreeAI dataset to run inference on. Must be either `train`, `val` or `test` (default: `test`).
 - `--batch_size` (optional): Batch size. If not provided, the corresponding value from the configuration file is used.
 - `--num_workers` (optional): Number of worker processes for data loading. If not provided, the corresponding value from the configuration file is used.
@@ -88,7 +92,7 @@ Use the `folder` mode to run inference on your own images. The script has the fo
 - Path to the trained **model checkpoint**.
 - Path to the **output directory** for predictions.
 - `--output-format` (optional): Output format for the model predictions. Must be either `.npy` or `.png` (default: `.npy`).
-`--visualization-dir` (optional): Path to a folder in which to save visualizations of the predictions. If not provided, no visualizations are created.
+- `--visualization-dir` (optional): Path to a folder in which to save visualizations of the predictions. If not provided, no visualizations are created.
 - `--batch_size` (optional): Batch size (default: 8).
 - `--num_workers` (optional): Number of worker processes for data loading (default: 8).
 `--class_remapping_file` (optional): Path to a JSON file containing a dictionary defining a mapping between consecutive class indices and class IDs. If not provided, the class indices are mapped to the class IDs of the TreeAI dataset per default.
