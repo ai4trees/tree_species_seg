@@ -2,26 +2,26 @@
 
 __all__ = ["CombinedLoss"]
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import segmentation_models_pytorch as smp
 import torch
 
 
 class CombinedLoss(torch.nn.Module):
-    """Loss function that combines cross-entropy loss and Dice loss."""
+    """Loss function that combines cross-entropy loss and LOvasz loss."""
 
-    def __init__(self, dice_weight: float = 0.5, ce_weight: float = 0.5, ignore_index: Optional[int] = None):
+    def __init__(self, lovasz_weight: float = 0.5, ce_weight: float = 0.5,
+                 ce_kwargs: Optional[Dict[str, Any]] = None,
+                 lovasz_kwargs: Optional[Dict[str, Any]] = None):
         super().__init__()
-        self.dice_loss = smp.losses.DiceLoss(mode="multiclass", ignore_index=ignore_index)
-        ce_kwargs = {}
-        if ignore_index is not None:
-            ce_kwargs["ignore_index"] = ignore_index
+        self.lovasz_loss = smp.losses.LovaszLoss(mode="multiclass", **lovasz_kwargs)
+        ce_kwargs = ce_kwargs or {}
         self.ce_loss = torch.nn.CrossEntropyLoss(**ce_kwargs)  # type: ignore[arg-type]
-        self.dice_weight = dice_weight
+        self.lovasz_weight = lovasz_weight
         self.ce_weight = ce_weight
 
     def forward(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        dice = self.dice_loss(outputs, targets)
+        lovasz = self.lovasz_loss(outputs, targets)
         ce = self.ce_loss(outputs, targets)
-        return self.dice_weight * dice + self.ce_weight * ce
+        return self.lovasz_weight * lovasz + self.ce_weight * ce
