@@ -195,6 +195,8 @@ def inference_tree_ai(
     output_format: Literal[".npy", ".png"] = ".npy",
     visualization_dir: Optional[str] = None,
     split: Literal["train", "val", "test"] = "test",
+    batch_size: Optional[int] = None,
+    num_workers: Optional[int] = None,
 ):
     """
     Runs inference on a given split of the TreeAI dataset.
@@ -205,11 +207,21 @@ def inference_tree_ai(
         output_format: Output file format: :code:`".npy"` | :code:`".png"`
         visualization_dir: Folder in which to save visualizations of the predictions. If set to :code:`None`, no
             visualizations are created.
-        split: Subset of the dataset for which to generate predictions: :code:`"train"` | :code:`"val"` | :code:`"test"`.
+        split: Subset of the dataset for which to generate predictions: :code:`"train"` | :code:`"val"` |
+            :code:`"test"`.
+        batch_size: Batch size. If not set, the corresponding value from the configuration file is used.
+        num_workers: Number of worker processes for dataloading.  If not set, the corresponding value from the
+            configuration file is used.
     """
 
     with open(config, "r") as file:
         conf = yaml.safe_load(file)
+
+    if batch_size is not None:
+        conf["dataset"]["batch_size"] = batch_size
+
+    if num_workers is not None:
+        conf["dataset"]["num_workers"] = num_workers
 
     datamodule = SemanticSegmentationDataModule(**conf["dataset"])
 
