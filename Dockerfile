@@ -52,6 +52,5 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 RUN python -m pip install --no-cache torch torchvision --index-url https://download.pytorch.org/whl/cu128
 
-RUN mkdir tree_species_seg
-ADD . tree_species_seg
+RUN git clone https://github.com/ai4trees/tree_species_seg.git
 RUN python -m pip install --no-cache ./tree_species_seg[dev]
