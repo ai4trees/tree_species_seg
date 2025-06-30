@@ -83,7 +83,9 @@ def main(
             save_top_k=1,
             every_n_epochs=1,
         ),
-        EarlyStopping(monitor="val/iou", mode="max", patience=10, verbose=True),
+        EarlyStopping(
+            monitor="val/iou", mode="max", patience=conf["training"].get("early_stopping_patience", 10), verbose=True
+        ),
         LearningRateMonitor(logging_interval="epoch"),
     ]
 
