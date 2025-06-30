@@ -78,7 +78,7 @@ def create_visualization(
             class_indices.append(i)
 
     # Create legend handles
-    handles = [plt.Rectangle((0, 0), 1, 1, fc=color_map[i]) for i in class_indices]
+    handles = [plt.Rectangle((0, 0), 1, 1, fc=color_map[i]) for i in class_indices]  # type: ignore[attr-defined]
 
     legend = fig.legend(
         handles,

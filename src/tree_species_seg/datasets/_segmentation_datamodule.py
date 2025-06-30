@@ -130,7 +130,7 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
             sampler = WeightedRandomSampler(
                 weights=train_dataset.sampling_weights,  # type: ignore[arg-type]
                 num_samples=len(train_dataset),
-                replacement=True
+                replacement=True,
             )
 
         return DataLoader(
