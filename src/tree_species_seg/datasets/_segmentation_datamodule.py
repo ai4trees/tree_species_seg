@@ -110,11 +110,11 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
                 force_reprocess=self._force_reprocess,
                 **self._dataset_config,
             )
-        if stage == "test" or stage is None:
+        if stage in ["test", "predict_custom_folder"] or stage is None:
             self.test_dataset = TreeAIDataset(
                 self._base_dir,
                 self._output_dir,
-                split="test",
+                split="custom_folder" if stage == "predict_custom_folder" else "test",
                 transforms=self._get_transforms("test"),
                 force_reprocess=self._force_reprocess,
                 **self._dataset_config,

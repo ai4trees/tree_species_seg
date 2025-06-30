@@ -1,20 +1,26 @@
 """Inference script."""
 
+from importlib_resources import files, as_file
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Union, cast
-import yaml
+from typing import Dict, List, Literal, Optional, Union, cast
 
 import colorcet as cc
 import fire
+import json
 from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
 import numpy.typing as npt
+import rasterio
+from rasterio.enums import ColorInterp
 import torch
 from tqdm import tqdm
+import yaml
 
-from tree_species_seg.data import SemanticSegmentationDataModule, TreeAIDataset
-from tree_species_seg.models.smp_semantic_segmentation_model import initialize_model, ForestSemanticSegmentationModule
+import tree_species_seg
+from tree_species_seg.datasets import SemanticSegmentationDataModule, TreeAIDataset
+from tree_species_seg.models.smp_semantic_segmentation_model import ForestSemanticSegmentationModule
+import tree_species_seg.pkg_data
 
 
 def create_visualization(
@@ -92,42 +98,48 @@ def create_visualization(
         plt.show()
 
 
-def main(
-    config: str,
+def inference(
+    data_loader: SemanticSegmentationDataModule,
+    class_remapping: Dict[int, int],
     checkpoint: str,
     output_dir: str,
+    *,
+    output_format: Literal[".npy", ".png"] = ".npy",
     visualization_dir: Optional[str] = None,
-    split: Literal["train", "val", "test"] = "test",
 ):
-    with open(config, "r") as file:
-        conf = yaml.safe_load(file)
+    """
+    Inference script.
+
+    Args:
+        data_loader: Data loader for the inference dataset.
+        class_remapping: Dictionary defining a mapping between consecutive class IDs and output class IDs.
+        checkpoint: Path of the model checkpoint file.
+        output_dir: Path of the folder in which to save the predictions.
+        output_format: Output file format: :code:`".npy"` | :code:`".png"`
+        visualization_dir: Directory in which to save visualizations of the predictions. If set to :code:`None`, no
+            visualizations are created.
+    """
+    if output_format not in [".npy", ".png"]:
+        raise ValueError(f"The output format {output_format} is not supported.")
 
     torch.set_float32_matmul_precision("medium")
 
     output_dir_path = Path(output_dir)
     output_dir_path.mkdir(exist_ok=True, parents=True)
 
-    datamodule = SemanticSegmentationDataModule(**conf["dataset"])
-
     model = ForestSemanticSegmentationModule.load_from_checkpoint(checkpoint)
     model.eval()
 
-    datamodule.setup(stage=split)
-    if split == "train":
-        data_loader = datamodule.train_dataloader()
-    if split == "val":
-        data_loader = datamodule.val_dataloader()
-    if split == "test":
-        data_loader = datamodule.test_dataloader()
-
-    dataset = cast(TreeAIDataset, data_loader.dataset)
-
+    num_classes = len(class_remapping)
     if visualization_dir is not None:
         visualization_dir_path = Path(visualization_dir)
         visualization_dir_path.mkdir(exist_ok=True, parents=True)
-        num_classes = max(dataset.class_mapping.keys()) + 1
         color_map = np.array([mcolors.to_rgb(color) for color in cc.glasbey])
         class_labels = np.arange(num_classes)
+
+    for class_idx in range(num_classes):
+        if class_idx not in class_remapping:
+            raise ValueError(f"Key {class_idx} is missing in class remapping.")
 
     with torch.inference_mode():
         for batch in tqdm(data_loader, desc="Generating predictions"):
@@ -137,13 +149,31 @@ def main(
 
             remapped_preds = np.zeros_like(preds)
 
-            for class_id, class_idx in dataset.class_mapping.items():
+            for class_idx, class_id in class_remapping.items():
                 remapped_preds[preds == class_idx] = class_id
             del preds
 
             for idx in range(len(batch["id"])):
-                prediction_path = output_dir_path / f"{batch['id'][idx]}.npy"
-                np.save(prediction_path, remapped_preds[idx])
+
+                prediction_path = output_dir_path / f"{batch['id'][idx]}"
+
+                if output_format == ".npy":
+                    prediction_path = prediction_path.with_suffix(".npy")
+                    np.save(prediction_path, remapped_preds[idx])
+                else:
+                    prediction_path = prediction_path.with_suffix(".png")
+                    prediction = remapped_preds[idx].astype(np.uint8)
+                    with rasterio.open(
+                        prediction_path,
+                        "w",
+                        driver="PNG",
+                        height=prediction.shape[0],
+                        width=prediction.shape[0],
+                        count=1,
+                        dtype=np.uint8,
+                    ) as output_file:
+                        output_file.write(prediction, 1)
+                        output_file.colorinterp = [ColorInterp.gray]
 
                 if visualization_dir is not None:
                     visualization_path = visualization_dir_path / f"{batch['id'][idx]}.png"
@@ -156,5 +186,123 @@ def main(
                     )
 
 
+def inference_tree_ai(
+    config: str,
+    checkpoint: str,
+    output_dir: str,
+    *,
+    output_format: Literal[".npy", ".png"] = ".npy",
+    visualization_dir: Optional[str] = None,
+    split: Literal["train", "val", "test"] = "test",
+):
+    """
+    Runs inference on a given split of the TreeAI dataset.
+
+    Args:
+        config: Path of the configuration file.
+        output_dir: Path of the folder in which to save the predictions.
+        output_format: Output file format: :code:`".npy"` | :code:`".png"`
+        visualization_dir: Folder in which to save visualizations of the predictions. If set to :code:`None`, no
+            visualizations are created.
+        split: Subset of the dataset for which to generate predictions: :code:`"train"` | :code:`"val"` | :code:`"test"`.
+    """
+
+    with open(config, "r") as file:
+        conf = yaml.safe_load(file)
+
+    datamodule = SemanticSegmentationDataModule(**conf["dataset"])
+
+    datamodule.setup(stage="fit" if split in ["train", "val"] else "test")
+    if split == "train":
+        dataset = datamodule.train_dataset
+        data_loader = datamodule.train_dataloader()
+    if split == "val":
+        dataset = datamodule.val_dataset
+        data_loader = datamodule.val_dataloader()
+    if split == "test":
+        dataset = datamodule.test_dataset
+        data_loader = datamodule.test_dataloader()
+
+    dataset = cast(TreeAIDataset, dataset)
+
+    if split in ["train", "val"]:
+        class_remapping = {0: 0}
+
+        for class_id, class_idx in dataset.class_mapping.items():
+            class_remapping[class_idx] = class_id
+    else:
+        class_remapping_file = files(tree_species_seg.pkg_data).joinpath("tree_ai_class_remapping.json")
+        with as_file(class_remapping_file) as class_remapping_file_path:
+            with open(class_remapping_file_path, mode="r", encoding="utf-8") as f:
+                class_remapping_json = json.load(f)
+                # convert string keys from JSON to integers
+                class_remapping = {int(class_idx): class_id for class_idx, class_id in class_remapping_json.items()}
+
+    inference(
+        data_loader,
+        class_remapping,
+        checkpoint,
+        output_dir,
+        output_format=output_format,
+        visualization_dir=visualization_dir,
+    )
+
+
+def inference_folder(
+    input_folder: str,
+    checkpoint: str,
+    output_dir: str,
+    output_format: Literal[".npy", ".png"] = ".npy",
+    visualization_dir: Optional[str] = None,
+    batch_size: int = 8,
+    num_workers: int = 8,
+    class_remapping_file: Optional[str] = None,
+):
+    """
+    Runs inference on a folder with image files.
+
+    Args:
+        input_folder: Path of the folder containing the input images.
+        checkpoint: Path of the model checkpoint file.
+        output_dir: Path of the folder in which to save the predictions.
+        output_format: Output file format: :code:`".npy"` | :code:`".png"`
+        visualization_dir: Folder in which to save visualizations of the predictions. If set to :code:`None`, no
+            visualizations are created.
+        batch_size: Batch size.
+        num_workers: Number of worker processes for dataloading.
+        class_remapping_file: Path of a JSON file containing a dictionary with a custom remapping of consecutive class
+            indices to class IDs. If set to :code:`None`, the class indices are remapped to the class IDs of the TreeAI
+            dataset.
+    """
+
+    datamodule = SemanticSegmentationDataModule(
+        input_folder, input_folder, batch_size=batch_size, num_workers=num_workers
+    )
+    datamodule.setup(stage="predict_custom_folder")
+    data_loader = datamodule.test_dataloader()
+
+    if class_remapping_file is None:
+        class_remapping_file = files(tree_species_seg.pkg_data).joinpath("tree_ai_class_remapping.json")
+        with as_file(class_remapping_file) as class_remapping_file_path:
+            with open(class_remapping_file_path, mode="r", encoding="utf-8") as f:
+                class_remapping_json = json.load(f)
+    else:
+        class_remapping_file = files(tree_species_seg.pkg_data).joinpath("tree_ai_class_remapping.json")
+        with as_file(class_remapping_file) as class_remapping_file_path:
+            with open(class_remapping_file_path, mode="r", encoding="utf-8") as f:
+                class_remapping_json = json.load(f)
+    # convert string keys from JSON to integers
+    class_remapping = {int(class_idx): class_id for class_idx, class_id in class_remapping_json.items()}
+
+    inference(
+        data_loader,
+        class_remapping,
+        checkpoint,
+        output_dir,
+        output_format=output_format,
+        visualization_dir=visualization_dir,
+    )
+
+
 if __name__ == "__main__":
-    fire.Fire(main)
+    fire.Fire({"tree_ai": inference_tree_ai, "folder": inference_folder})

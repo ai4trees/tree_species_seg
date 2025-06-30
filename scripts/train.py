@@ -14,7 +14,7 @@ from lightning.pytorch.loggers import WandbLogger
 import torch
 import yaml
 
-from tree_species_seg.data import SemanticSegmentationDataModule
+from tree_species_seg.datasets import SemanticSegmentationDataModule
 from tree_species_seg.models.smp_semantic_segmentation_model import initialize_model
 
 
@@ -26,9 +26,12 @@ def main(
     checkpoint: Optional[str] = None,
 ):
     """
+    Training script.
+
     Args:
         config: Path to the configuration file.
-        wandb_project: Weights and Biases project name.
+        wandb_project: Weights and Biases project name. If set to :code:`None`, no Weights and Biases logger is created.
+        run_name: Runname to be included in the checkpoint file names.
         tags: Comma-separated tags for Weights and Biases run.
         checkpoint: Path to checkpoint file to resume from.
     """
@@ -63,9 +66,10 @@ def main(
     datamodule = SemanticSegmentationDataModule(**datamodule_config, dataset_config=dataset_config)
     model = initialize_model(conf["model"], checkpoint)
 
-    checkpoint_dir_name = f"{model_config['model_name']}_{model_config['encoder_name']}_{model_config['loss_type']}"
     if run_name is not None:
-        checkpoint_dir_name = f"{checkpoint_dir_name}_{run_name}"
+        checkpoint_dir_name = run_name
+    else:
+        checkpoint_dir_name = f"{model_config['model_name']}_{model_config['encoder_name']}_{model_config['loss_type']}"
     checkpoint_dir = Path(conf["training"]["checkpoint_dir"]) / f"{datamodule_config['name']}/{checkpoint_dir_name}"
 
     callbacks = [

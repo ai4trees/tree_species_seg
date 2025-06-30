@@ -35,6 +35,7 @@ dependencies = [
     "albumentations",
     "colorcet",
     "fire",
+    "importlib_resources",
     "lightning",
     "numpy",
     "pyyaml",
