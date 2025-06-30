@@ -35,6 +35,7 @@ class TreeAIDataset(Dataset):
         self,
         base_dir: str,
         output_dir: str,
+        *,
         split: Literal["train", "val", "test", "custom_folder"] = "train",
         transforms: Optional[A.Compose] = None,
         include_partially_labeled_data: bool = False,
@@ -128,7 +129,7 @@ class TreeAIDataset(Dataset):
 
         return all_images
 
-    def _preprocess_train_val_data(self):
+    def _preprocess_train_val_data(self):  # pylint: disable=too-many-locals, too-many-branches,too-many-statements
         image_folder = self._dir_full / "images"
         label_folder = self._dir_full / "labels"
 
@@ -214,7 +215,7 @@ class TreeAIDataset(Dataset):
 
             if self._sampling_weight == "sqrt":
                 class_weights = 1 / np.sqrt(class_distribution_np)
-            elif self._loss_config["class_weight"] == "linear":
+            elif self._sampling_weight == "linear":
                 class_weights = 1 / class_distribution_np
 
             normalization_factor = class_distribution_np.sum() / (class_distribution_np * class_weights).sum()
@@ -235,7 +236,7 @@ class TreeAIDataset(Dataset):
 
         return all_images
 
-    def _preprocess_dataset(self):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+    def _preprocess_dataset(self):
         """
         Preprocesses the dataset. This involves the following preprocessing steps:
 

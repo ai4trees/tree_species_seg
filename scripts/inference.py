@@ -14,6 +14,7 @@ import numpy.typing as npt
 import rasterio
 from rasterio.enums import ColorInterp
 import torch
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 import yaml
 
@@ -77,11 +78,11 @@ def create_visualization(
             class_indices.append(i)
 
     # Create legend handles
-    handles = [plt.Rectangle((0, 0), 1, 1, fc=color_map[i]) for i in class_indices]  # type: ignore[attr-defined]
+    handles = [plt.Rectangle((0, 0), 1, 1, fc=color_map[i]) for i in class_indices]
 
     legend = fig.legend(
         handles,
-        [class_labels[i] for i in class_indices],
+        [str(class_labels[i]) for i in class_indices],
         loc="center left",
         bbox_to_anchor=(0.85, 0.5),
         fontsize=10,
@@ -99,7 +100,7 @@ def create_visualization(
 
 
 def inference(
-    data_loader: SemanticSegmentationDataModule,
+    data_loader: DataLoader,
     class_remapping: Dict[int, int],
     checkpoint: str,
     output_dir: str,

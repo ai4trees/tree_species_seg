@@ -9,15 +9,19 @@ import torch
 
 
 class CombinedLoss(torch.nn.Module):
-    """Loss function that combines cross-entropy loss and LOvasz loss."""
+    """Loss function that combines cross-entropy loss and Lovasz loss."""
 
-    def __init__(self, lovasz_weight: float = 0.5, ce_weight: float = 0.5,
-                 ce_kwargs: Optional[Dict[str, Any]] = None,
-                 lovasz_kwargs: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        lovasz_weight: float = 0.5,
+        ce_weight: float = 0.5,
+        ce_kwargs: Optional[Dict[str, Any]] = None,
+        lovasz_kwargs: Optional[Dict[str, Any]] = None,
+    ):
         super().__init__()
         self.lovasz_loss = smp.losses.LovaszLoss(mode="multiclass", **lovasz_kwargs)
         ce_kwargs = ce_kwargs or {}
-        self.ce_loss = torch.nn.CrossEntropyLoss(**ce_kwargs)  # type: ignore[arg-type]
+        self.ce_loss = torch.nn.CrossEntropyLoss(**ce_kwargs)
         self.lovasz_weight = lovasz_weight
         self.ce_weight = ce_weight
 
