@@ -76,6 +76,8 @@ class SemanticSegmentationDataModule(pl.LightningDataModule):
                     raise ValueError(f"Invalid transform: {transform}.")
                 transforms.append(transforms_map[transform])
 
+        print("Transforms:", transforms)
+
         # Common transforms for all splits
         transforms.extend(
             [

@@ -196,12 +196,12 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
             return self._loss_config["loss_type"]
 
         loss_map = {
-            "cross_entropy": nn.CrossEntropyLoss(),
+            "cross_entropy": nn.CrossEntropyLoss,
             "dice": smp.losses.DiceLoss,
-            "focal": FocalLoss(),
+            "focal": FocalLoss,
             "lovasz": smp.losses.LovaszLoss,
             "tversky": smp.losses.TverskyLoss,
-            "combined": CombinedLoss,
+            "cross_entropy_lovasz": CombinedLoss,
         }
 
         loss_type = cast(str, self._loss_config["loss_type"])
@@ -211,12 +211,12 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         if loss_type in ["dice", "focal", "lovasz", "tversky"]:
             kwargs["mode"] = "multiclass"
 
-        if self._loss_config["label_smoothing"] is not None and loss_type in ["cross_entropy", "focal"]:
+        if self._loss_config["label_smoothing"] is not None and loss_type in ["cross_entropy", "focal", "cross_entropy_lovasz"]:
             kwargs["label_smoothing"] = self._loss_config["label_smoothing"]
         if (
             self._loss_config["class_weight"] in ["sqrt", "linear"]
             and class_distribution is not None
-            and loss_type in ["cross_entropy", "focal"]
+            and loss_type in ["cross_entropy", "focal", "cross_entropy_lovasz"]
         ):
             class_distribution_tensor = torch.tensor(
                 list(class_distribution.values()), device=self.device, dtype=torch.float
@@ -234,6 +234,8 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
         if loss_cls is None:
             raise ValueError(f"Unsupported loss type: {loss_type}")
 
+        if loss_type == "cross_entropy_lovasz":
+            return loss_cls(ce_kwargs=kwargs, lovasz_kwargs={"ignore_index": -1})
         return loss_cls(**kwargs)
 
     def setup(self, stage: Optional[str] = None):
