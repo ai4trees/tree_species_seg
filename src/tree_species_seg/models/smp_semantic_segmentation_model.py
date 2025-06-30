@@ -80,7 +80,7 @@ class ForestSemanticSegmentationModule(pl.LightningModule):
             "label_smoothing": label_smoothing,
             "class_weight": loss_class_weight,
         }
-        self.loss = self._create_loss_function()
+        self.loss = self._create_loss_function(class_distribution={class_idx: 1 for class_idx in range(num_classes)})
 
         # Create global metrics (no per-step logging)
         self._setup_metrics(num_classes)
