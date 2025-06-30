@@ -148,13 +148,19 @@ def inference(
             logits = model(images)
             preds = torch.argmax(logits, dim=1).cpu().numpy()
 
+            remapped_target = np.zeros_like(preds)
             remapped_preds = np.zeros_like(preds)
 
             for class_idx, class_id in class_remapping.items():
                 remapped_preds[preds == class_idx] = class_id
+                if "mask" in batch:
+                    remapped_target[batch["mask"] == class_idx] = class_id
             del preds
 
             for idx in range(len(batch["id"])):
+                mask = None
+                if "mask" in batch:
+                    mask = remapped_target[idx]
 
                 prediction_path = output_dir_path / f"{batch['id'][idx]}"
 
@@ -182,6 +188,7 @@ def inference(
                         images[idx].cpu().numpy(),
                         color_map,
                         class_labels,
+                        target=mask,
                         prediction=remapped_preds[idx],
                         save_path=visualization_path,
                     )
