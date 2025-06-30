@@ -1,0 +1,25 @@
+seed: 42
+dataset:
+  name: tree_ai
+  batch_size: 8
+  num_workers: 8
+  base_dir: /workspace/data/1_raw_data
+  output_dir: /workspace/data/2_processed_data/
+  force_reprocess: False
+  tree_ai:
+    ignore_white_and_black_pixels: False
+    include_partially_labeled_data: True
+model:
+  num_classes: 58
+  in_channels: 3
+  learning_rate: 0.00006
+  weight_decay: 0.00001
+  model_name: segformer
+  encoder_name: mit_b4
+  loss_type: cross_entropy
+  loss_class_weight: none
+  label_smoothing: 0.2
+  max_epochs: 100
+training:
+  checkpoint_dir: /workspace/data/models
+  early_stopping_patience: 15
